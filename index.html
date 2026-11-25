@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Illustration Retouch Studio PRO — FLUX.2 [klein] 4B</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+
+    .bg-checkerboard {
+      background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .drag-active {
+      border-color: #6366f1 !important;
+      background-color: rgba(99, 102, 241, 0.12) !important;
+    }
+  </style>
+</head>
+<body class="bg-[#0d0f14] text-gray-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <header class="sticky top-0 z-30 border-b border-[#1e2330] bg-[#13161f]/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 shrink-0">
+          <i data-lucide="paintbrush" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight truncate">Illustration Retouch Studio PRO</h1>
+            <span class="px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">PRO</span>
+          </div>
+          <p class="text-[11px] text-gray-400 hidden sm:block truncate">白紙からの手書きラフ生成・既存絵の部分修正ループ／左サンプルで絵柄合わせ</p>
+        </div>
+      </div>
+
+      <button id="openSettingsModalBtn" type="button" class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20">
+        <span id="apiStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+        <span id="apiStatusText">API設定未完了</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+      <!-- 左カラム: 絵柄サンプル＆指示 -->
+      <section class="lg:col-span-4 flex flex-col gap-5">
+
+        <!-- 絵柄サンプル専用 -->
+        <div class="bg-[#161a23] rounded-2xl border border-[#1e2330] p-4 shadow-lg space-y-2.5 shrink-0">
+          <div class="flex items-center justify-between">
+            <label for="styleImageInput" class="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+              <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+              絵柄サンプル（この絵柄で描く）
+            </label>
+            <button id="clearStyleBtn" type="button" class="hidden text-[11px] text-red-400 hover:text-red-300">
+              クリア
+            </button>
+          </div>
+
+          <div id="styleDropZone" class="cursor-pointer rounded-xl border border-dashed border-[#2a3142] hover:border-indigo-500 bg-[#13161f]/70 p-2.5 flex items-center gap-3 transition-colors min-h-[76px]">
+            <input type="file" id="styleImageInput" accept="image/png, image/jpeg, image/webp" class="hidden" />
+            <img id="stylePreviewImg" src="" alt="絵柄サンプル" class="hidden w-14 h-14 rounded-lg object-cover border border-[#2a3142] shrink-0 bg-checkerboard" />
+            <div id="stylePlaceholderIcon" class="w-11 h-11 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+              <i data-lucide="image" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p id="styleStatusText" class="text-xs text-gray-300 truncate">絵柄サンプル画像をドロップまたは選択</p>
+              <p class="text-[10px] text-gray-500">線画・塗り・色調をこの絵柄に合わせます</p>
+            </div>
+          </div>
+
+          <label id="includeStyleToggleWrap" class="hidden items-center gap-2 text-[11px] text-gray-300 cursor-pointer select-none">
+            <input type="checkbox" id="includeStyleOnRequestToggle" checked class="rounded bg-[#161a23] border-[#2a3142] text-indigo-500 focus:ring-indigo-500" />
+            <span>絵柄サンプルも参照画像（<code class="text-indigo-300">input_image_1</code>）として送る</span>
+          </label>
+        </div>
+
+        <!-- 修正・描画指示・Gemini補助・送信プロンプト -->
+        <div class="flex-1 bg-[#161a23] rounded-2xl border border-[#1e2330] p-5 shadow-lg flex flex-col justify-between gap-4">
+          <div class="flex-1 flex flex-col gap-4">
+            <div class="flex items-center justify-between gap-2">
+              <label for="jpEditInput" class="text-sm font-bold flex items-center gap-2 text-white">
+                <span class="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                描画・修正指示（ラフとあわせて反映）
+              </label>
+              <label class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#13161f] border border-[#2a3142] text-indigo-300 cursor-pointer select-none">
+                <input type="checkbox" id="geminiAssistToggle" checked class="rounded bg-[#13161f] border-[#2a3142] text-indigo-500 focus:ring-indigo-500" />
+                <span>Gemini整形</span>
+              </label>
+            </div>
+
+            <div class="flex-1 flex flex-col">
+              <textarea id="jpEditInput" rows="4" class="w-full flex-1 min-h-[104px] rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none p-3.5 text-sm leading-relaxed resize-none transition-all placeholder:text-gray-500 text-gray-100" placeholder="例（白紙から）: ラフのポーズで微笑む黒髪ボブの少女を描く。背景は柔らかい光が差す窓辺&#10;例（修正）: 丸で囲んだ顔を笑顔にする / 描いたラフ線に沿って腕の位置を調整"></textarea>
+            </div>
+
+            <div class="flex-1 flex flex-col space-y-2 pt-2 border-t border-[#1e2330]">
+              <div class="flex items-center justify-between">
+                <label for="editPromptInput" class="text-xs font-semibold text-gray-300">
+                  送信プロンプト（英語・自動生成または直接編集可）
+                </label>
+                <button type="button" id="convertNowBtn" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+                  今すぐGeminiで英語化
+                </button>
+              </div>
+              <textarea id="editPromptInput" rows="4" class="w-full flex-1 min-h-[100px] rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none p-3 text-xs font-mono leading-relaxed resize-none text-emerald-300 placeholder:text-gray-600" placeholder="Gemini整形ONで実行すると、ラフ線誘導・ラフ除去・絵柄合わせを含む英語プロンプトが自動生成されます"></textarea>
+            </div>
+          </div>
+
+          <div class="space-y-4 pt-2 border-t border-[#1e2330]">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-[11px] text-gray-400">
+                  <label for="guidanceInput">Guidance</label>
+                  <span id="guidanceLabel" class="font-mono text-indigo-300">3.5</span>
+                </div>
+                <input type="range" id="guidanceInput" min="1.0" max="10.0" step="0.5" value="3.5" class="w-full accent-indigo-500 cursor-pointer" />
+              </div>
+
+              <div class="space-y-1">
+                <label for="seedInput" class="text-[11px] text-gray-400 block">シード値（任意）</label>
+                <input type="number" id="seedInput" placeholder="ランダム" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none px-3 py-1.5 text-xs font-mono text-gray-200 placeholder:text-gray-500" />
+              </div>
+            </div>
+
+            <button id="retouchBtn" type="button" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>ラフ＆指示を反映して生成</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 右カラム: メインの大きなウインドウ（新規白紙キャンバス作成 / 画像読み込み / ラフ描きループ） -->
+      <section class="lg:col-span-8 flex flex-col gap-5">
+
+        <div id="errorDiagnosticBox" class="hidden bg-rose-950/60 border border-rose-500/40 rounded-2xl p-4 space-y-2.5 shadow-lg">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2 text-rose-300 font-bold text-sm">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+              <span id="errorTitle">エラーが発生しました</span>
+            </div>
+            <button id="closeErrorBoxBtn" type="button" class="text-rose-400 hover:text-rose-200 p-1">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p id="errorAdvice" class="text-xs text-rose-200 leading-relaxed"></p>
+          <pre id="errorRawDetail" class="text-[11px] font-mono bg-black/50 text-rose-300 p-2.5 rounded-xl overflow-x-auto border border-rose-500/20 whitespace-pre-wrap"></pre>
+        </div>
+
+        <div class="flex-1 bg-[#161a23] rounded-2xl border border-[#1e2330] p-5 shadow-lg flex flex-col min-h-[620px] space-y-4">
+
+          <!-- 上部ツールバー -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-[#1e2330]">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1 bg-[#13161f] p-1 rounded-xl border border-[#1e2330]">
+                <button type="button" id="modeDrawBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e2330] text-white shadow-sm transition-all flex items-center gap-1.5">
+                  <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i> メイン編集（ラフ描き）
+                </button>
+                <button type="button" id="viewCompareBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition-all flex items-center gap-1.5">
+                  <i data-lucide="columns-2" class="w-3.5 h-3.5"></i> 直前と比較
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="topNewBlankBtn" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                <i data-lucide="file-plus-2" class="w-3.5 h-3.5"></i> 新規白紙
+              </button>
+
+              <div id="resultActions" class="hidden flex flex-wrap items-center gap-2">
+                <button id="downloadBtn" type="button" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i> PNG保存
+                </button>
+              </div>
+
+              <button id="clearSourceBtn" type="button" class="hidden text-xs text-red-400 hover:text-red-300 flex items-center gap-1 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 閉じる
+              </button>
+            </div>
+          </div>
+
+          <!-- ラフ描画ツールバー（メイン画面にキャンバスがあるときに表示） -->
+          <div id="markerEditorPanel" class="hidden flex-wrap items-center justify-between gap-3 bg-[#13161f] px-3.5 py-2.5 rounded-xl border border-[#2a3142]">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1 bg-[#161a23] p-1 rounded-lg border border-[#2a3142]">
+                <button type="button" id="toolBrushBtn" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1">
+                  <i data-lucide="brush" class="w-3.5 h-3.5"></i> ラフペン
+                </button>
+                <button type="button" id="toolEraserBtn" class="px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1">
+                  <i data-lucide="eraser" class="w-3.5 h-3.5"></i> 消す
+                </button>
+              </div>
+
+              <div class="flex items-center gap-1.5 bg-[#161a23] px-2.5 py-1 rounded-lg border border-[#2a3142]" role="group" aria-label="ペンカラー3色">
+                <span class="text-[11px] text-gray-400 mr-0.5">ペン色:</span>
+                <button type="button" data-color="red" title="赤ペン" class="color-swatch w-5 h-5 rounded-full bg-rose-500 ring-2 ring-white scale-110 transition-all"></button>
+                <button type="button" data-color="blue" title="青ペン" class="color-swatch w-5 h-5 rounded-full bg-sky-500 opacity-70 hover:opacity-100 transition-all"></button>
+                <button type="button" data-color="green" title="緑ペン" class="color-swatch w-5 h-5 rounded-full bg-emerald-500 opacity-70 hover:opacity-100 transition-all"></button>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] text-gray-400 font-mono">太さ: <span id="brushSizeLabel">8</span>px</span>
+                <input type="range" id="brushSizeInput" min="2" max="60" value="8" class="w-20 accent-indigo-500 cursor-pointer" />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-300 cursor-pointer select-none">
+                <input type="checkbox" id="includeMarkerOnSourceToggle" checked class="rounded bg-[#161a23] border-[#2a3142] text-indigo-500 focus:ring-indigo-500" />
+                <span>ラフ込みで送信（<code class="text-indigo-300">input_image_0</code>）</span>
+              </label>
+              <button type="button" id="clearMarkerBtn" class="px-2.5 py-1 rounded-lg bg-[#1e2330] hover:bg-[#2a3142] text-xs text-gray-300 transition-colors">
+                ラフ全消去
+              </button>
+              <button type="button" id="reselectImageBtn" class="text-[11px] text-indigo-300 hover:text-indigo-200 underline">
+                画像を読み込み
+              </button>
+            </div>
+          </div>
+
+          <!-- メイン表示領域 -->
+          <div class="flex-1 flex flex-col items-center justify-center py-2 relative">
+
+            <!-- 初期ドロップゾーン＆新規白紙キャンバス選択 -->
+            <div id="dropZone" class="w-full flex-1 min-h-[460px] relative rounded-2xl border-2 border-dashed border-[#2a3142] hover:border-indigo-500/80 bg-[#13161f]/60 transition-all duration-200 overflow-hidden flex flex-col items-center justify-center p-6 text-center">
+              <input type="file" id="imageInput" accept="image/png, image/jpeg, image/webp" class="hidden" />
+
+              <div class="max-w-lg w-full space-y-6">
+                <!-- 1. 新規白紙キャンバスから描く -->
+                <div class="bg-[#161a23]/90 border border-[#2a3142] rounded-2xl p-5 space-y-3.5 shadow-lg">
+                  <div class="flex items-center justify-center gap-2 text-indigo-300 font-bold text-sm">
+                    <i data-lucide="file-plus-2" class="w-4 h-4"></i>
+                    <span>新規白紙キャンバスから手書き＋絵柄参照で描く</span>
+                  </div>
+                  <p class="text-xs text-gray-400 leading-relaxed">
+                    白紙に大まかな構図やポーズのラフを描き、左の絵柄サンプルとプロンプト指示から新規イラストを生成します。
+                  </p>
+                  <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button type="button" data-w="768" data-h="768" class="new-blank-preset-btn px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 flex items-center gap-1.5 transition-all">
+                      <i data-lucide="square" class="w-3.5 h-3.5"></i> 新規 1:1 (768×768)
+                    </button>
+                    <button type="button" data-w="640" data-h="832" class="new-blank-preset-btn px-3.5 py-2 rounded-xl bg-[#1e2330] hover:bg-[#2a3142] border border-[#2a3142] text-gray-100 text-xs font-semibold flex items-center gap-1.5 transition-all">
+                      <i data-lucide="rectangle-vertical" class="w-3.5 h-3.5 text-indigo-400"></i> 縦長 3:4 (640×832)
+                    </button>
+                    <button type="button" data-w="832" data-h="640" class="new-blank-preset-btn px-3.5 py-2 rounded-xl bg-[#1e2330] hover:bg-[#2a3142] border border-[#2a3142] text-gray-100 text-xs font-semibold flex items-center gap-1.5 transition-all">
+                      <i data-lucide="rectangle-horizontal" class="w-3.5 h-3.5 text-indigo-400"></i> 横長 4:3 (832×640)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 2. 既存画像を読み込む -->
+                <div id="uploadClickArea" class="cursor-pointer group rounded-2xl border border-[#2a3142] hover:border-indigo-500 bg-[#161a23]/50 p-4 flex items-center justify-center gap-3.5 transition-all">
+                  <div class="w-11 h-11 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <i data-lucide="image-plus" class="w-5 h-5"></i>
+                  </div>
+                  <div class="text-left">
+                    <p class="text-xs sm:text-sm font-bold text-gray-200">既存画像を読み込んで修正する</p>
+                    <p class="text-[11px] text-gray-400">クリックでファイル選択、または画面へドラッグ＆ドロップ / Ctrl+V 貼り付け</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- メイン描画＆生成結果表示キャンバス -->
+            <div id="drawCanvasContainer" class="hidden w-full flex-1 flex flex-col items-center justify-center space-y-2">
+              <div class="relative rounded-xl overflow-hidden bg-checkerboard border border-[#2a3142] shadow-2xl max-h-[540px] flex items-center justify-center">
+                <div id="canvasWrapper" class="relative inline-block leading-none select-none touch-none">
+                  <canvas id="baseCanvas" class="block max-h-[540px] w-auto h-auto pointer-events-none"></canvas>
+                  <canvas id="markerOverlayCanvas" class="block max-h-[540px] w-auto h-auto absolute inset-0 cursor-crosshair"></canvas>
+                </div>
+              </div>
+              <div class="w-full flex items-center justify-between text-[11px] text-gray-400 font-mono px-1">
+                <span id="sourceMetaText">サイズ: -</span>
+                <span id="canvasStageBadge">ラフ描き・再修正可能</span>
+              </div>
+            </div>
+
+            <!-- ローディング表示 -->
+            <div id="loadingCanvasState" class="hidden text-center max-w-md mx-auto space-y-4 py-12 w-full">
+              <div class="relative w-20 h-20 mx-auto">
+                <div class="absolute inset-0 rounded-2xl border-4 border-indigo-500/20"></div>
+                <div class="absolute inset-0 rounded-2xl border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-indigo-400">
+                  <i data-lucide="paintbrush" class="w-7 h-7 animate-pulse"></i>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <h3 id="loadingTitle" class="text-base font-bold text-white">生成処理中...</h3>
+                <p id="loadingSubtitle" class="text-xs text-gray-400"></p>
+              </div>
+            </div>
+
+            <!-- 直前と比較表示（タブ切替時のみ） -->
+            <div id="compareResultView" class="hidden w-full grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+              <div class="space-y-2">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#13161f] text-gray-300 border border-[#1e2330]">
+                  直前の画像 / ラフ下地
+                </span>
+                <div class="rounded-xl overflow-hidden bg-checkerboard border border-[#2a3142] aspect-square flex items-center justify-center p-2">
+                  <img id="compareBeforeImg" src="" alt="直前の画像" class="max-h-full max-w-full object-contain rounded-lg" />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                  生成結果
+                </span>
+                <div class="rounded-xl overflow-hidden bg-checkerboard border-2 border-indigo-500/50 aspect-square flex items-center justify-center p-2 shadow-lg">
+                  <img id="compareAfterImg" src="" alt="生成結果" class="max-h-full max-w-full object-contain rounded-lg" />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div id="resultMetaBar" class="hidden pt-3 border-t border-[#1e2330] flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+            <p id="usedPromptText" class="truncate max-w-xl font-mono text-[11px] text-gray-300"></p>
+            <span id="usedSeedBadge" class="px-2 py-0.5 rounded bg-[#13161f] font-mono text-[10px]"></span>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- 画面下部: 生成履歴（横スクロール帯） -->
+    <section class="bg-[#161a23] rounded-2xl border border-[#1e2330] p-4 shadow-lg">
+      <div class="flex items-center justify-between mb-2.5">
+        <h2 class="text-sm font-bold flex items-center gap-2 text-white">
+          <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i>
+          生成履歴
+          <span id="historyCount" class="text-xs font-normal text-gray-400">(0件)</span>
+        </h2>
+        <button id="clearHistoryBtn" type="button" class="hidden text-xs text-gray-400 hover:text-rose-400 transition-colors">
+          履歴をクリア
+        </button>
+      </div>
+
+      <div id="historyEmpty" class="text-center py-4 text-xs text-gray-500 border border-dashed border-[#1e2330] rounded-xl">
+        生成された画像はここに横並びで蓄積されます（クリックでメイン画面に展開して再修正）。
+      </div>
+
+      <div id="historyGrid" class="hidden flex gap-3 overflow-x-auto pb-2"></div>
+    </section>
+
+  </main>
+
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-[#161a23] border border-[#2a3142] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
+      <div class="flex items-center justify-between border-b border-[#1e2330] pb-3.5">
+        <div>
+          <h3 class="font-bold text-base text-white">API・モデル接続設定</h3>
+          <p class="text-[11px] text-gray-400">ブラウザのローカルストレージに保存されます</p>
+        </div>
+        <button id="closeSettingsModalBtn" type="button" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#1e2330] transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="cfAccountIdInput" class="text-xs font-bold text-indigo-300 block">Cloudflare Account ID</label>
+        <input type="text" id="cfAccountIdInput" placeholder="32桁のAccount ID" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none px-3.5 py-2.5 text-xs font-mono text-gray-100" />
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="cfApiTokenInput" class="text-xs font-bold text-indigo-300 block">Cloudflare Workers AI API Token</label>
+        <div class="relative">
+          <input type="password" id="cfApiTokenInput" placeholder="Workers AI 権限付きトークン" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none pl-3.5 pr-10 py-2.5 text-xs font-mono text-gray-100" />
+          <button type="button" id="toggleCfTokenVis" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="workersModelInput" class="text-xs font-bold text-gray-300 block">Workers AI 画像編集モデルID</label>
+        <input type="text" id="workersModelInput" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none px-3.5 py-2.5 text-xs font-mono text-gray-100" />
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="geminiApiKeyInput" class="text-xs font-bold text-indigo-300 block">Gemini API Key（Gemini整形を使う場合）</label>
+        <div class="relative">
+          <input type="password" id="geminiApiKeyInput" placeholder="AIza..." class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none pl-3.5 pr-10 py-2.5 text-xs font-mono text-gray-100" />
+          <button type="button" id="toggleGeminiKeyVis" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="geminiModelInput" class="text-xs font-bold text-gray-300 block">Gemini テキストモデル</label>
+        <input type="text" id="geminiModelInput" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none px-3.5 py-2.5 text-xs font-mono text-gray-100" />
+      </div>
+
+      <div class="space-y-1.5">
+        <label for="customProxyInput" class="text-xs font-bold text-gray-300 block">プロキシベースURL（CORS回避用・任意）</label>
+        <input type="text" id="customProxyInput" placeholder="例: https://your-proxy.workers.dev" class="w-full rounded-xl bg-[#13161f] border border-[#2a3142] focus:border-indigo-500 outline-none px-3.5 py-2.5 text-xs font-mono text-gray-100" />
+      </div>
+
+      <div class="flex items-center justify-between gap-2 pt-3 border-t border-[#1e2330]">
+        <button id="clearKeysBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 transition-colors">
+          設定を削除
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="cancelSettingsBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-[#1e2330] transition-colors">
+            閉じる
+          </button>
+          <button id="saveSettingsBtn" type="button" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 transition-colors">
+            保存して適用
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <script>
+    lucide.createIcons();
+
+    const DEFAULT_RETOUCH_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+    const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+
+    const PEN_COLORS = {
+      red: { stroke: "rgba(244, 63, 94, 0.85)", label: "赤" },
+      blue: { stroke: "rgba(14, 165, 233, 0.85)", label: "青" },
+      green: { stroke: "rgba(16, 185, 129, 0.85)", label: "緑" }
+    };
+
+    const STORAGE_KEYS = {
+      CF_ACCOUNT_ID: "retouch_v3_cf_account_id",
+      CF_API_TOKEN: "retouch_v3_cf_api_token",
+      WORKERS_MODEL: "retouch_v3_workers_model",
+      GEMINI_KEY: "retouch_v3_gemini_api_key",
+      GEMINI_MODEL: "retouch_v3_gemini_model",
+      PROXY: "retouch_v3_cf_proxy"
+    };
+
+    const state = {
+      cfAccountId: "",
+      cfApiToken: "",
+      workersModel: DEFAULT_RETOUCH_MODEL,
+      geminiApiKey: "",
+      geminiModel: DEFAULT_GEMINI_MODEL,
+      customProxy: "",
+      sourceImage: null, // { width, height, dataUrl, name, isBlank }
+      styleImage: null,
+      tool: "brush",
+      penColor: "red",
+      brushSize: 8,
+      isDrawing: false,
+      lastPoint: null,
+      canvasMode: "draw", // "draw" | "compare"
+      isProcessing: false,
+      currentResult: null,
+      history: []
+    };
+
+    const els = {
+      openSettingsModalBtn: document.getElementById("openSettingsModalBtn"),
+      apiStatusDot: document.getElementById("apiStatusDot"),
+      apiStatusText: document.getElementById("apiStatusText"),
+      settingsModal: document.getElementById("settingsModal"),
+      closeSettingsModalBtn: document.getElementById("closeSettingsModalBtn"),
+      cancelSettingsBtn: document.getElementById("cancelSettingsBtn"),
+      cfAccountIdInput: document.getElementById("cfAccountIdInput"),
+      cfApiTokenInput: document.getElementById("cfApiTokenInput"),
+      toggleCfTokenVis: document.getElementById("toggleCfTokenVis"),
+      workersModelInput: document.getElementById("workersModelInput"),
+      geminiApiKeyInput: document.getElementById("geminiApiKeyInput"),
+      toggleGeminiKeyVis: document.getElementById("toggleGeminiKeyVis"),
+      geminiModelInput: document.getElementById("geminiModelInput"),
+      customProxyInput: document.getElementById("customProxyInput"),
+      saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+      clearKeysBtn: document.getElementById("clearKeysBtn"),
+
+      styleDropZone: document.getElementById("styleDropZone"),
+      styleImageInput: document.getElementById("styleImageInput"),
+      stylePreviewImg: document.getElementById("stylePreviewImg"),
+      stylePlaceholderIcon: document.getElementById("stylePlaceholderIcon"),
+      styleStatusText: document.getElementById("styleStatusText"),
+      clearStyleBtn: document.getElementById("clearStyleBtn"),
+      includeStyleToggleWrap: document.getElementById("includeStyleToggleWrap"),
+      includeStyleOnRequestToggle: document.getElementById("includeStyleOnRequestToggle"),
+
+      jpEditInput: document.getElementById("jpEditInput"),
+      geminiAssistToggle: document.getElementById("geminiAssistToggle"),
+      convertNowBtn: document.getElementById("convertNowBtn"),
+      editPromptInput: document.getElementById("editPromptInput"),
+      guidanceInput: document.getElementById("guidanceInput"),
+      guidanceLabel: document.getElementById("guidanceLabel"),
+      seedInput: document.getElementById("seedInput"),
+      retouchBtn: document.getElementById("retouchBtn"),
+
+      errorDiagnosticBox: document.getElementById("errorDiagnosticBox"),
+      closeErrorBoxBtn: document.getElementById("closeErrorBoxBtn"),
+      errorTitle: document.getElementById("errorTitle"),
+      errorAdvice: document.getElementById("errorAdvice"),
+      errorRawDetail: document.getElementById("errorRawDetail"),
+
+      modeDrawBtn: document.getElementById("modeDrawBtn"),
+      viewCompareBtn: document.getElementById("viewCompareBtn"),
+      topNewBlankBtn: document.getElementById("topNewBlankBtn"),
+      resultActions: document.getElementById("resultActions"),
+      downloadBtn: document.getElementById("downloadBtn"),
+      clearSourceBtn: document.getElementById("clearSourceBtn"),
+
+      markerEditorPanel: document.getElementById("markerEditorPanel"),
+      toolBrushBtn: document.getElementById("toolBrushBtn"),
+      toolEraserBtn: document.getElementById("toolEraserBtn"),
+      colorSwatches: Array.from(document.querySelectorAll(".color-swatch")),
+      brushSizeLabel: document.getElementById("brushSizeLabel"),
+      brushSizeInput: document.getElementById("brushSizeInput"),
+      clearMarkerBtn: document.getElementById("clearMarkerBtn"),
+      includeMarkerOnSourceToggle: document.getElementById("includeMarkerOnSourceToggle"),
+      reselectImageBtn: document.getElementById("reselectImageBtn"),
+
+      dropZone: document.getElementById("dropZone"),
+      uploadClickArea: document.getElementById("uploadClickArea"),
+      newBlankPresetBtns: Array.from(document.querySelectorAll(".new-blank-preset-btn")),
+      imageInput: document.getElementById("imageInput"),
+      drawCanvasContainer: document.getElementById("drawCanvasContainer"),
+      baseCanvas: document.getElementById("baseCanvas"),
+      markerOverlayCanvas: document.getElementById("markerOverlayCanvas"),
+      sourceMetaText: document.getElementById("sourceMetaText"),
+      canvasStageBadge: document.getElementById("canvasStageBadge"),
+
+      loadingCanvasState: document.getElementById("loadingCanvasState"),
+      loadingTitle: document.getElementById("loadingTitle"),
+      loadingSubtitle: document.getElementById("loadingSubtitle"),
+      compareResultView: document.getElementById("compareResultView"),
+      compareBeforeImg: document.getElementById("compareBeforeImg"),
+      compareAfterImg: document.getElementById("compareAfterImg"),
+      resultMetaBar: document.getElementById("resultMetaBar"),
+      usedPromptText: document.getElementById("usedPromptText"),
+      usedSeedBadge: document.getElementById("usedSeedBadge"),
+
+      historyCount: document.getElementById("historyCount"),
+      clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+      historyEmpty: document.getElementById("historyEmpty"),
+      historyGrid: document.getElementById("historyGrid"),
+      toastContainer: document.getElementById("toastContainer")
+    };
+
+    function showToast(message, type = "info") {
+      const colors = {
+        info: "bg-[#1e2330] border-[#2a3142] text-gray-100",
+        success: "bg-emerald-950/90 border-emerald-500/40 text-emerald-200",
+        error: "bg-rose-950/90 border-rose-500/40 text-rose-200"
+      };
+      const toast = document.createElement("div");
+      toast.className = `pointer-events-auto border rounded-xl px-4 py-3 text-xs font-medium shadow-xl transition-all ${colors[type] || colors.info}`;
+      toast.textContent = message;
+      els.toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 250);
+      }, 3200);
+    }
+
+    function clearErrorDiagnostic() {
+      els.errorDiagnosticBox.classList.add("hidden");
+      els.errorTitle.textContent = "";
+      els.errorAdvice.textContent = "";
+      els.errorRawDetail.textContent = "";
+    }
+
+    function showErrorDiagnostic(title, advice, detail = "") {
+      els.errorTitle.textContent = title;
+      els.errorAdvice.textContent = advice;
+      els.errorRawDetail.textContent = detail;
+      els.errorDiagnosticBox.classList.remove("hidden");
+    }
+
+    els.closeErrorBoxBtn.addEventListener("click", clearErrorDiagnostic);
+
+    function updateApiBadge() {
+      const ready = Boolean(state.cfAccountId.trim() && state.cfApiToken.trim().length >= 8);
+      if (ready) {
+        els.openSettingsModalBtn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20";
+        els.apiStatusDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+        els.apiStatusText.textContent = "Workers AI設定済";
+      } else {
+        els.openSettingsModalBtn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20";
+        els.apiStatusDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+        els.apiStatusText.textContent = "API設定未完了";
+      }
+    }
+
+    function openSettingsModal() {
+      els.cfAccountIdInput.value = state.cfAccountId;
+      els.cfApiTokenInput.value = state.cfApiToken;
+      els.workersModelInput.value = state.workersModel;
+      els.geminiApiKeyInput.value = state.geminiApiKey;
+      els.geminiModelInput.value = state.geminiModel;
+      els.customProxyInput.value = state.customProxy;
+      els.settingsModal.classList.remove("hidden");
+    }
+
+    function closeSettingsModal() {
+      els.settingsModal.classList.add("hidden");
+    }
+
+    function loadSettings() {
+      state.cfAccountId = localStorage.getItem(STORAGE_KEYS.CF_ACCOUNT_ID) || "";
+      state.cfApiToken = localStorage.getItem(STORAGE_KEYS.CF_API_TOKEN) || "";
+      state.workersModel = localStorage.getItem(STORAGE_KEYS.WORKERS_MODEL) || DEFAULT_RETOUCH_MODEL;
+      state.geminiApiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_KEY) || "";
+      state.geminiModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || DEFAULT_GEMINI_MODEL;
+      state.customProxy = localStorage.getItem(STORAGE_KEYS.PROXY) || "";
+      updateApiBadge();
+    }
+
+    els.openSettingsModalBtn.addEventListener("click", openSettingsModal);
+    els.closeSettingsModalBtn.addEventListener("click", closeSettingsModal);
+    els.cancelSettingsBtn.addEventListener("click", closeSettingsModal);
+
+    els.toggleCfTokenVis.addEventListener("click", () => {
+      els.cfApiTokenInput.type = els.cfApiTokenInput.type === "password" ? "text" : "password";
+    });
+    els.toggleGeminiKeyVis.addEventListener("click", () => {
+      els.geminiApiKeyInput.type = els.geminiApiKeyInput.type === "password" ? "text" : "password";
+    });
+
+    els.saveSettingsBtn.addEventListener("click", () => {
+      state.cfAccountId = els.cfAccountIdInput.value.trim();
+      state.cfApiToken = els.cfApiTokenInput.value.trim();
+      state.workersModel = els.workersModelInput.value.trim() || DEFAULT_RETOUCH_MODEL;
+      state.geminiApiKey = els.geminiApiKeyInput.value.trim();
+      state.geminiModel = els.geminiModelInput.value.trim() || DEFAULT_GEMINI_MODEL;
+      state.customProxy = els.customProxyInput.value.trim();
+
+      localStorage.setItem(STORAGE_KEYS.CF_ACCOUNT_ID, state.cfAccountId);
+      localStorage.setItem(STORAGE_KEYS.CF_API_TOKEN, state.cfApiToken);
+      localStorage.setItem(STORAGE_KEYS.WORKERS_MODEL, state.workersModel);
+      localStorage.setItem(STORAGE_KEYS.GEMINI_KEY, state.geminiApiKey);
+      localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, state.geminiModel);
+      localStorage.setItem(STORAGE_KEYS.PROXY, state.customProxy);
+
+      updateApiBadge();
+      closeSettingsModal();
+      showToast("設定を保存しました。", "success");
+    });
+
+    els.clearKeysBtn.addEventListener("click", () => {
+      state.cfAccountId = "";
+      state.cfApiToken = "";
+      state.workersModel = DEFAULT_RETOUCH_MODEL;
+      state.geminiApiKey = "";
+      state.geminiModel = DEFAULT_GEMINI_MODEL;
+      state.customProxy = "";
+      Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+      openSettingsModal();
+      updateApiBadge();
+      showToast("設定をリセットしました。", "info");
+    });
+
+    function syncMainWorkspaceVisibility() {
+      els.dropZone.classList.add("hidden");
+      els.drawCanvasContainer.classList.add("hidden");
+      els.loadingCanvasState.classList.add("hidden");
+      els.compareResultView.classList.add("hidden");
+
+      const activeTabClass = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e2330] text-white shadow-sm transition-all flex items-center gap-1.5";
+      const inactiveTabClass = "px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition-all flex items-center gap-1.5";
+
+      els.modeDrawBtn.className = state.canvasMode === "draw" ? activeTabClass : inactiveTabClass;
+      els.viewCompareBtn.className = state.canvasMode === "compare" ? activeTabClass : inactiveTabClass;
+
+      if (state.isProcessing) {
+        els.loadingCanvasState.classList.remove("hidden");
+      } else if (state.canvasMode === "compare" && state.currentResult) {
+        els.compareResultView.classList.remove("hidden");
+      } else if (state.sourceImage) {
+        els.drawCanvasContainer.classList.remove("hidden");
+      } else {
+        els.dropZone.classList.remove("hidden");
+      }
+
+      const showDrawToolbar = Boolean(state.sourceImage) && !state.isProcessing && state.canvasMode === "draw";
+      els.markerEditorPanel.classList.toggle("hidden", !showDrawToolbar);
+      els.markerEditorPanel.classList.toggle("flex", showDrawToolbar);
+      els.clearSourceBtn.classList.toggle("hidden", !state.sourceImage);
+    }
+
+    function setCanvasMode(mode) {
+      if (mode === "compare" && !state.currentResult) {
+        showToast("比較できる生成結果がまだありません。", "info");
+        return;
+      }
+      state.canvasMode = mode;
+      syncMainWorkspaceVisibility();
+    }
+
+    els.modeDrawBtn.addEventListener("click", () => setCanvasMode("draw"));
+    els.viewCompareBtn.addEventListener("click", () => setCanvasMode("compare"));
+
+    function clampDimension(n) {
+      return Math.max(256, Math.min(1024, Math.round(n / 8) * 8));
+    }
+
+    function resetMarkerOverlay(w, h) {
+      els.markerOverlayCanvas.width = w;
+      els.markerOverlayCanvas.height = h;
+      const octx = els.markerOverlayCanvas.getContext("2d");
+      octx.clearRect(0, 0, w, h);
+    }
+
+    function createBlankCanvas(w = 768, h = 768) {
+      const width = clampDimension(w);
+      const height = clampDimension(h);
+
+      els.baseCanvas.width = width;
+      els.baseCanvas.height = height;
+      const bctx = els.baseCanvas.getContext("2d");
+      bctx.fillStyle = "#ffffff";
+      bctx.fillRect(0, 0, width, height);
+
+      const dataUrl = els.baseCanvas.toDataURL("image/png");
+      state.sourceImage = { width, height, dataUrl, name: "blank_canvas.png", isBlank: true };
+      state.currentResult = null;
+      els.resultActions.classList.add("hidden");
+      els.resultMetaBar.classList.add("hidden");
+
+      resetMarkerOverlay(width, height);
+      els.sourceMetaText.textContent = `サイズ: ${width} × ${height} px（新規白紙）`;
+      els.canvasStageBadge.textContent = "白紙キャンバスに手書きラフ描き中";
+      state.canvasMode = "draw";
+      syncMainWorkspaceVisibility();
+      showToast(`新規白紙キャンバス（${width}×${height}）を作成しました。ラフを描いて生成してください。`, "success");
+    }
+
+    els.newBlankPresetBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const w = parseInt(btn.dataset.w || "768", 10);
+        const h = parseInt(btn.dataset.h || "768", 10);
+        createBlankCanvas(w, h);
+      });
+    });
+
+    els.topNewBlankBtn.addEventListener("click", () => {
+      const w = state.sourceImage?.width || 768;
+      const h = state.sourceImage?.height || 768;
+      createBlankCanvas(w, h);
+    });
+
+    function applyImageToMainCanvas(img, { name = "source.png", keepSize = false, stageLabel = "ラフ描き・再修正可能" } = {}) {
+      let w;
+      let h;
+      if (keepSize && state.sourceImage) {
+        w = state.sourceImage.width;
+        h = state.sourceImage.height;
+      } else {
+        const natW = img.naturalWidth || img.width;
+        const natH = img.naturalHeight || img.height;
+        const maxDim = 1024;
+        let scale = 1;
+        if (natW > maxDim || natH > maxDim) {
+          scale = Math.min(maxDim / natW, maxDim / natH);
+        }
+        w = clampDimension(natW * scale);
+        h = clampDimension(natH * scale);
+      }
+
+      els.baseCanvas.width = w;
+      els.baseCanvas.height = h;
+      const bctx = els.baseCanvas.getContext("2d");
+      bctx.clearRect(0, 0, w, h);
+      bctx.drawImage(img, 0, 0, w, h);
+
+      const dataUrl = els.baseCanvas.toDataURL("image/png");
+      state.sourceImage = { width: w, height: h, dataUrl, name, isBlank: false };
+
+      resetMarkerOverlay(w, h);
+      els.sourceMetaText.textContent = `サイズ: ${w} × ${h} px`;
+      els.canvasStageBadge.textContent = stageLabel;
+      state.canvasMode = "draw";
+      syncMainWorkspaceVisibility();
+    }
+
+    function handleImageFile(file) {
+      if (!file || !file.type.startsWith("image/")) {
+        showToast("PNG / JPEG / WebP 画像を選択してください。", "error");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          state.currentResult = null;
+          els.resultActions.classList.add("hidden");
+          els.resultMetaBar.classList.add("hidden");
+          applyImageToMainCanvas(img, { name: file.name || "source.png", keepSize: false, stageLabel: "元画像にラフを描き込み中" });
+          showToast("元画像を読み込みました。画面上にラフを描いて生成できます。", "success");
+        };
+        img.onerror = () => showToast("画像の読み込みに失敗しました。", "error");
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleStyleImageFile(file) {
+      if (!file || !file.type.startsWith("image/")) {
+        showToast("絵柄サンプル用のPNG / JPEG / WebP 画像を選択してください。", "error");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxDim = 768;
+          const natW = img.naturalWidth || img.width;
+          const natH = img.naturalHeight || img.height;
+          const scale = Math.min(1, maxDim / Math.max(natW, natH));
+          canvas.width = Math.max(64, Math.round(natW * scale));
+          canvas.height = Math.max(64, Math.round(natH * scale));
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const dataUrl = canvas.toDataURL("image/png");
+          state.styleImage = {
+            name: file.name || "style_sample.png",
+            dataUrl,
+            width: canvas.width,
+            height: canvas.height
+          };
+          els.stylePreviewImg.src = dataUrl;
+          els.stylePreviewImg.classList.remove("hidden");
+          els.stylePlaceholderIcon.classList.add("hidden");
+          els.styleStatusText.textContent = `絵柄サンプル: ${state.styleImage.name}`;
+          els.clearStyleBtn.classList.remove("hidden");
+          els.includeStyleToggleWrap.classList.remove("hidden");
+          els.includeStyleToggleWrap.classList.add("inline-flex");
+          showToast("絵柄サンプルを読み込みました。この絵柄に合わせて描きます。", "success");
+        };
+        img.onerror = () => showToast("絵柄サンプル画像の読み込みに失敗しました。", "error");
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearStyleImage() {
+      state.styleImage = null;
+      els.stylePreviewImg.src = "";
+      els.stylePreviewImg.classList.add("hidden");
+      els.stylePlaceholderIcon.classList.remove("hidden");
+      els.styleStatusText.textContent = "絵柄サンプル画像をドロップまたは選択";
+      els.clearStyleBtn.classList.add("hidden");
+      els.includeStyleToggleWrap.classList.add("hidden");
+      els.includeStyleToggleWrap.classList.remove("inline-flex");
+    }
+
+    els.uploadClickArea.addEventListener("click", () => els.imageInput.click());
+    els.reselectImageBtn.addEventListener("click", () => els.imageInput.click());
+    els.imageInput.addEventListener("change", (e) => {
+      if (e.target.files?.[0]) handleImageFile(e.target.files[0]);
+      e.target.value = "";
+    });
+
+    ["dragenter", "dragover"].forEach((evt) => {
+      els.dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        els.dropZone.classList.add("drag-active");
+      });
+    });
+    ["dragleave", "drop"].forEach((evt) => {
+      els.dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        els.dropZone.classList.remove("drag-active");
+      });
+    });
+    els.dropZone.addEventListener("drop", (e) => {
+      if (e.dataTransfer?.files?.[0]) handleImageFile(e.dataTransfer.files[0]);
+    });
+
+    els.styleDropZone.addEventListener("click", () => els.styleImageInput.click());
+    els.styleImageInput.addEventListener("change", (e) => {
+      if (e.target.files?.[0]) handleStyleImageFile(e.target.files[0]);
+      e.target.value = "";
+    });
+    ["dragenter", "dragover"].forEach((evt) => {
+      els.styleDropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        els.styleDropZone.classList.add("drag-active");
+      });
+    });
+    ["dragleave", "drop"].forEach((evt) => {
+      els.styleDropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        els.styleDropZone.classList.remove("drag-active");
+      });
+    });
+    els.styleDropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer?.files?.[0]) handleStyleImageFile(e.dataTransfer.files[0]);
+    });
+    els.clearStyleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearStyleImage();
+      showToast("絵柄サンプルをクリアしました。", "info");
+    });
+
+    document.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) {
+            if (!state.sourceImage) {
+              handleImageFile(f);
+            } else {
+              handleStyleImageFile(f);
+            }
+            break;
+          }
+        }
+      }
+    });
+
+    els.clearSourceBtn.addEventListener("click", () => {
+      state.sourceImage = null;
+      state.currentResult = null;
+      state.canvasMode = "draw";
+      els.resultActions.classList.add("hidden");
+      els.resultMetaBar.classList.add("hidden");
+      syncMainWorkspaceVisibility();
+      showToast("キャンバスを閉じました。", "info");
+    });
+
+    function setTool(tool) {
+      state.tool = tool;
+      if (tool === "brush") {
+        els.toolBrushBtn.className = "px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1";
+        els.toolEraserBtn.className = "px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1";
+      } else {
+        els.toolEraserBtn.className = "px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1";
+        els.toolBrushBtn.className = "px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1";
+      }
+    }
+
+    function setPenColor(colorKey) {
+      if (!PEN_COLORS[colorKey]) return;
+      state.penColor = colorKey;
+      setTool("brush");
+      els.colorSwatches.forEach((btn) => {
+        const active = btn.dataset.color === colorKey;
+        btn.classList.toggle("ring-2", active);
+        btn.classList.toggle("ring-white", active);
+        btn.classList.toggle("scale-110", active);
+        btn.classList.toggle("opacity-70", !active);
+      });
+    }
+
+    els.toolBrushBtn.addEventListener("click", () => setTool("brush"));
+    els.toolEraserBtn.addEventListener("click", () => setTool("eraser"));
+    els.colorSwatches.forEach((btn) => {
+      btn.addEventListener("click", () => setPenColor(btn.dataset.color));
+    });
+
+    els.brushSizeInput.addEventListener("input", (e) => {
+      state.brushSize = parseInt(e.target.value, 10);
+      els.brushSizeLabel.textContent = String(state.brushSize);
+    });
+
+    els.clearMarkerBtn.addEventListener("click", () => {
+      if (!state.sourceImage) return;
+      resetMarkerOverlay(state.sourceImage.width, state.sourceImage.height);
+      showToast("ラフ描画を消去しました。", "info");
+    });
+
+    function getCanvasCoords(e) {
+      const rect = els.markerOverlayCanvas.getBoundingClientRect();
+      const scaleX = els.markerOverlayCanvas.width / rect.width;
+      const scaleY = els.markerOverlayCanvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    function drawMarkerStroke(fromPt, toPt) {
+      const octx = els.markerOverlayCanvas.getContext("2d");
+      octx.save();
+      octx.lineCap = "round";
+      octx.lineJoin = "round";
+      octx.lineWidth = state.brushSize;
+      if (state.tool === "brush") {
+        octx.globalCompositeOperation = "source-over";
+        octx.strokeStyle = (PEN_COLORS[state.penColor] || PEN_COLORS.red).stroke;
+      } else {
+        octx.globalCompositeOperation = "destination-out";
+        octx.strokeStyle = "rgba(0, 0, 0, 1)";
+      }
+      octx.beginPath();
+      octx.moveTo(fromPt.x, fromPt.y);
+      octx.lineTo(toPt.x, toPt.y);
+      octx.stroke();
+      octx.restore();
+    }
+
+    els.markerOverlayCanvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      els.markerOverlayCanvas.setPointerCapture(e.pointerId);
+      state.isDrawing = true;
+      const pt = getCanvasCoords(e);
+      state.lastPoint = pt;
+      drawMarkerStroke(pt, pt);
+    });
+
+    els.markerOverlayCanvas.addEventListener("pointermove", (e) => {
+      if (!state.isDrawing) return;
+      const pt = getCanvasCoords(e);
+      drawMarkerStroke(state.lastPoint || pt, pt);
+      state.lastPoint = pt;
+    });
+
+    function stopDrawing(e) {
+      if (!state.isDrawing) return;
+      state.isDrawing = false;
+      state.lastPoint = null;
+      if (e && els.markerOverlayCanvas.hasPointerCapture(e.pointerId)) {
+        els.markerOverlayCanvas.releasePointerCapture(e.pointerId);
+      }
+    }
+
+    els.markerOverlayCanvas.addEventListener("pointerup", stopDrawing);
+    els.markerOverlayCanvas.addEventListener("pointercancel", stopDrawing);
+
+    els.guidanceInput.addEventListener("input", (e) => {
+      els.guidanceLabel.textContent = Number(e.target.value).toFixed(1);
+    });
+
+    function buildFallbackPrompt(jpText, hasRough, hasStyleRef, isBlank) {
+      const parts = [jpText];
+      if (isBlank) {
+        if (hasRough) {
+          parts.push("turn the hand-drawn rough sketch on the white canvas into a complete finished illustration following its composition and pose, completely removing all rough sketch strokes");
+        } else {
+          parts.push("create a complete finished illustration on the canvas");
+        }
+      } else if (hasRough) {
+        parts.push("follow the drawn rough lines/circles as pose, position, or region guidance, remove all rough strokes and color marks completely, and render clean finished artwork in those areas");
+      }
+
+      if (hasStyleRef) {
+        parts.push("draw in the exact art style, linework, coloring, shading, and color palette of the style reference image");
+      } else if (!isBlank) {
+        parts.push("keep surrounding areas, proportions, and art style consistent");
+      }
+      return parts.join(", ");
+    }
+
+    async function convertEditInstructionWithGemini(jpText, hasRough = true, hasStyleRef = false, isBlank = false) {
+      if (!state.geminiApiKey) {
+        throw new Error("Gemini APIキーが設定されていません。");
+      }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.geminiModel)}:generateContent?key=${encodeURIComponent(state.geminiApiKey)}`;
+
+      let roughInstruction;
+      if (isBlank) {
+        roughInstruction = hasRough
+          ? "The base image (input_image_0) is a blank white canvas with a hand-drawn rough sketch. Use the rough sketch strictly as the composition, silhouette, and pose guide to create a brand-new, fully rendered illustration from scratch, completely removing all rough colored sketch lines in the final output."
+          : "The base image (input_image_0) is a blank white canvas. Create a brand-new, fully rendered illustration from scratch based on the prompt.";
+      } else {
+        roughInstruction = hasRough
+          ? "The user drew rough lines, circles, or annotations on the base image (input_image_0) to indicate target regions, circle-enclosed areas like faces, or rough pose/limb placement lines like arm lines. Treat the rough strokes as structural/positional guidance, remove all rough strokes and colored pen marks cleanly in the final output, and keep unedited parts intact."
+          : "No rough strokes are drawn on the base image; apply the requested edit cleanly while keeping unchanged areas consistent.";
+      }
+
+      const styleInstruction = hasStyleRef
+        ? "A style reference image (input_image_1) is provided as the target art style sample. Explicitly instruct the image editor to draw and render in the art style, line weight, shading/coloring technique, and color palette of this style sample."
+        : (isBlank ? "Render with clean, appealing digital illustration linework and shading." : "Maintain consistency with the original illustration's art style and lighting.");
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{
+              text: `You convert a short Japanese illustration creation/retouching instruction into a concise, clear English prompt for an image-to-image model. ${roughInstruction} ${styleInstruction} Output ONLY the single English prompt without quotes, explanations, or markdown.`
+            }]
+          },
+          contents: [{ role: "user", parts: [{ text: jpText }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 200 }
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Gemini API エラー (HTTP ${res.status}) ${errText.slice(0, 220)}`);
+      }
+      const data = await res.json();
+      return (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").replace(/\n+/g, ", ").trim();
+    }
+
+    els.convertNowBtn.addEventListener("click", async () => {
+      clearErrorDiagnostic();
+      const jp = els.jpEditInput.value.trim();
+      if (!jp) {
+        showToast("描画・修正指示を入力してください。", "error");
+        return;
+      }
+      try {
+        els.convertNowBtn.disabled = true;
+        els.convertNowBtn.textContent = "変換中...";
+        const hasRough = els.includeMarkerOnSourceToggle.checked;
+        const hasStyleRef = Boolean(state.styleImage && els.includeStyleOnRequestToggle.checked);
+        const isBlank = Boolean(state.sourceImage?.isBlank);
+        const en = await convertEditInstructionWithGemini(jp, hasRough, hasStyleRef, isBlank);
+        if (en) {
+          els.editPromptInput.value = en;
+          showToast("英語プロンプトに変換しました。", "success");
+        }
+      } catch (err) {
+        showErrorDiagnostic(
+          "Gemini整形エラー",
+          "Gemini APIキーやモデル名を確認してください。混雑（503）の場合は少し待って再試行するか、英語プロンプト欄に直接入力して実行できます。",
+          err.message
+        );
+      } finally {
+        els.convertNowBtn.disabled = false;
+        els.convertNowBtn.textContent = "今すぐGeminiで英語化";
+      }
+    });
+
+    function buildWorkersAiUrl() {
+      const basePath = `/client/v4/accounts/${encodeURIComponent(state.cfAccountId)}/ai/run/${state.workersModel}`;
+      if (state.customProxy) {
+        return `${state.customProxy.replace(/\/$/, "")}${basePath}`;
+      }
+      return `https://api.cloudflare.com${basePath}`;
+    }
+
+    async function buildReferenceImageDataUrl() {
+      if (!els.includeMarkerOnSourceToggle.checked) {
+        return els.baseCanvas.toDataURL("image/png");
+      }
+      const composite = document.createElement("canvas");
+      composite.width = els.baseCanvas.width;
+      composite.height = els.baseCanvas.height;
+      const ctx = composite.getContext("2d");
+      ctx.drawImage(els.baseCanvas, 0, 0);
+      ctx.drawImage(els.markerOverlayCanvas, 0, 0);
+      return composite.toDataURL("image/png");
+    }
+
+    async function dataUrlToBlob(dataUrl) {
+      const res = await fetch(dataUrl);
+      return await res.blob();
+    }
+
+    async function extractImageBlobFromResponse(res) {
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (ct.includes("application/json")) {
+        const json = await res.json();
+        const b64 = json?.result?.image || json?.image || "";
+        if (!b64) {
+          throw new Error("Workers AI のJSON応答に画像データが含まれていませんでした。");
+        }
+        const clean = b64.replace(/^data:image\/\w+;base64,/, "");
+        const bin = atob(clean);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: "image/png" });
+      }
+      return await res.blob();
+    }
+
+    async function handleRetouch() {
+      if (state.isProcessing) return;
+      clearErrorDiagnostic();
+
+      if (!state.cfAccountId || !state.cfApiToken || state.cfApiToken.length < 8) {
+        showToast("先に右上のボタンからCloudflare Account IDとAPIトークンを設定してください。", "error");
+        openSettingsModal();
+        return;
+      }
+
+      if (!state.sourceImage) {
+        showToast("先に右のメイン画面で「新規白紙」を作成するか、元画像を読み込んでください。", "error");
+        return;
+      }
+
+      const jpRaw = els.jpEditInput.value.trim();
+      const manualPrompt = els.editPromptInput.value.trim();
+      const useGemini = els.geminiAssistToggle.checked;
+      const hasRough = els.includeMarkerOnSourceToggle.checked;
+      const hasStyleRef = Boolean(state.styleImage && els.includeStyleOnRequestToggle.checked);
+      const isBlank = Boolean(state.sourceImage.isBlank);
+
+      if (!jpRaw && !manualPrompt) {
+        showToast("描画・修正指示または送信プロンプトを入力してください。", "error");
+        return;
+      }
+
+      if (useGemini && jpRaw && !state.geminiApiKey) {
+        showToast("Gemini整形を使う場合はGemini APIキーを設定するか、チェックを外して英語プロンプトを直接入力してください。", "error");
+        openSettingsModal();
+        return;
+      }
+
+      state.isProcessing = true;
+      els.retouchBtn.disabled = true;
+      syncMainWorkspaceVisibility();
+
+      try {
+        let promptToSend = manualPrompt;
+        if (jpRaw && useGemini) {
+          els.loadingTitle.textContent = "Geminiで描画・修正プロンプトを作成中...";
+          els.loadingSubtitle.textContent = isBlank
+            ? `モデル: ${state.geminiModel}（白紙ラフ描き起こし＋絵柄サンプル反映）`
+            : `モデル: ${state.geminiModel}（ラフ誘導・ラフ除去・絵柄合わせを自動付与）`;
+          promptToSend = await convertEditInstructionWithGemini(jpRaw, hasRough, hasStyleRef, isBlank);
+          els.editPromptInput.value = promptToSend;
+        } else if (!promptToSend && jpRaw) {
+          promptToSend = buildFallbackPrompt(jpRaw, hasRough, hasStyleRef, isBlank);
+        }
+
+        els.loadingTitle.textContent = isBlank ? "Workers AIで白紙ラフから描画生成中..." : "Workers AIで修正反映中...";
+        els.loadingSubtitle.textContent = `${state.workersModel} (${state.sourceImage.width}×${state.sourceImage.height})`;
+
+        const beforeDataUrl = await buildReferenceImageDataUrl();
+        const refBlob = await dataUrlToBlob(beforeDataUrl);
+        const guidance = parseFloat(els.guidanceInput.value);
+        const manualSeed = els.seedInput.value.trim();
+        const seed = manualSeed ? parseInt(manualSeed, 10) : Math.floor(Math.random() * 2147483647);
+
+        const formData = new FormData();
+        formData.append("prompt", promptToSend);
+        formData.append("input_image_0", refBlob, "reference.png");
+        if (hasStyleRef && state.styleImage?.dataUrl) {
+          const styleBlob = await dataUrlToBlob(state.styleImage.dataUrl);
+          formData.append("input_image_1", styleBlob, "style_reference.png");
+        }
+        formData.append("width", String(state.sourceImage.width));
+        formData.append("height", String(state.sourceImage.height));
+        formData.append("guidance", String(guidance));
+        formData.append("seed", String(seed));
+
+        const res = await fetch(buildWorkersAiUrl(), {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${state.cfApiToken}`
+          },
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`Workers AI エラー (HTTP ${res.status}) ${errText.slice(0, 280)}`);
+        }
+
+        const outBlob = await extractImageBlobFromResponse(res);
+        const afterUrl = URL.createObjectURL(outBlob);
+
+        const item = {
+          id: "retouch_" + Date.now(),
+          beforeUrl: beforeDataUrl,
+          afterUrl,
+          prompt: promptToSend,
+          seed,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        };
+
+        state.currentResult = item;
+        els.compareBeforeImg.src = item.beforeUrl;
+        els.compareAfterImg.src = item.afterUrl;
+        els.usedPromptText.textContent = item.prompt;
+        els.usedSeedBadge.textContent = `Seed: ${item.seed}`;
+        els.resultActions.classList.remove("hidden");
+        els.resultMetaBar.classList.remove("hidden");
+
+        const outImg = new Image();
+        outImg.onload = () => {
+          applyImageToMainCanvas(outImg, {
+            name: `generated_${seed}.png`,
+            keepSize: true,
+            stageLabel: `生成済み（Seed: ${seed}）— 続けてラフを描いて再生成可能`
+          });
+          addToHistory(item);
+          showToast("生成画像をメイン画面に表示しました。続けてラフを描いて修正できます。", "success");
+        };
+        outImg.src = afterUrl;
+      } catch (err) {
+        if (err.message.includes("Failed to fetch") || err.name === "TypeError") {
+          showErrorDiagnostic(
+            "通信がブロックされました（CORS / ネットワーク）",
+            "ブラウザから api.cloudflare.com への直接通信がCORSでブロックされる場合があります。設定画面のプロキシURL欄に中継WorkerのURLを設定するか、通信環境を確認してください。",
+            err.message
+          );
+        } else {
+          showErrorDiagnostic(
+            "生成・修正エラー",
+            "Cloudflare Account ID、Workers AI API Token（Workers AI権限）、モデルIDを確認してください。",
+            err.message
+          );
+        }
+      } finally {
+        state.isProcessing = false;
+        els.retouchBtn.disabled = false;
+        syncMainWorkspaceVisibility();
+      }
+    }
+
+    els.retouchBtn.addEventListener("click", handleRetouch);
+
+    els.downloadBtn.addEventListener("click", () => {
+      const targetUrl = state.currentResult?.afterUrl || state.sourceImage?.dataUrl;
+      if (!targetUrl) return;
+      const a = document.createElement("a");
+      a.href = targetUrl;
+      a.download = `illustration_${state.currentResult?.seed || Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast("PNG画像を保存しました。", "success");
+    });
+
+    function addToHistory(item) {
+      state.history.unshift(item);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const count = state.history.length;
+      els.historyCount.textContent = `(${count}件)`;
+      if (count === 0) {
+        els.historyEmpty.classList.remove("hidden");
+        els.historyGrid.classList.add("hidden");
+        els.clearHistoryBtn.classList.add("hidden");
+        return;
+      }
+      els.historyEmpty.classList.add("hidden");
+      els.historyGrid.classList.remove("hidden");
+      els.clearHistoryBtn.classList.remove("hidden");
+      els.historyGrid.innerHTML = "";
+
+      state.history.forEach((item) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "group relative w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-checkerboard border border-[#2a3142] hover:border-indigo-500 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500";
+        btn.title = item.prompt;
+        btn.innerHTML = `
+          <img src="${item.afterUrl}" alt="生成履歴" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+          <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-1.5 text-left opacity-0 group-hover:opacity-100 transition-opacity">
+            <p class="text-[10px] font-mono text-indigo-300 truncate">${item.prompt}</p>
+            <span class="text-[9px] text-gray-300">${item.timestamp}</span>
+          </div>
+        `;
+        btn.addEventListener("click", () => {
+          state.currentResult = item;
+          els.compareBeforeImg.src = item.beforeUrl;
+          els.compareAfterImg.src = item.afterUrl;
+          els.usedPromptText.textContent = item.prompt;
+          els.usedSeedBadge.textContent = `Seed: ${item.seed}`;
+          els.resultActions.classList.remove("hidden");
+          els.resultMetaBar.classList.remove("hidden");
+
+          const img = new Image();
+          img.onload = () => {
+            applyImageToMainCanvas(img, {
+              name: `history_${item.seed}.png`,
+              keepSize: false,
+              stageLabel: `履歴（Seed: ${item.seed}）を展開中 — 続けてラフ描き可能`
+            });
+            showToast("履歴画像をメイン画面に展開しました。", "info");
+          };
+          img.src = item.afterUrl;
+        });
+        els.historyGrid.appendChild(btn);
+      });
+    }
+
+    els.clearHistoryBtn.addEventListener("click", () => {
+      state.history.forEach((h) => {
+        if (h.afterUrl) URL.revokeObjectURL(h.afterUrl);
+      });
+      state.history = [];
+      renderHistory();
+      showToast("履歴をクリアしました。", "info");
+    });
+
+    loadSettings();
+    syncMainWorkspaceVisibility();
+  </script>
+</body>
+</html>
